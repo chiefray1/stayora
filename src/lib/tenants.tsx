@@ -75,6 +75,8 @@ interface TenantValue {
   createTenant: (input: NewTenantInput) => Tenant;
   updateTenant: (id: string, patch: Partial<Tenant>) => void;
   setTenantStatus: (id: string, status: TenantStatus) => void;
+  /** Permanently remove a workspace from the platform (never the last one). */
+  removeTenant: (id: string) => void;
   addBranch: (tenantId: string, branch: Omit<Branch, "id">) => GuardResult;
   updateBranch: (tenantId: string, branchId: string, patch: Partial<Branch>) => void;
   removeBranch: (tenantId: string, branchId: string) => void;
@@ -327,6 +329,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setTenants((prev) => prev.map((tenant) => (tenant.id === id ? { ...tenant, status } : tenant)));
   }, []);
 
+  const removeTenant = useCallback((id: string) => {
+    if (tenants.length <= 1) return;
+    const remaining = tenants.filter((tenant) => tenant.id !== id);
+    if (remaining.length === tenants.length) return;
+    setTenants(remaining);
+    if (currentId === id) setCurrentId(remaining[0].id);
+  }, [tenants, currentId]);
+
   const addBranch = useCallback((tenantId: string, input: Omit<Branch, "id">): GuardResult => {
     const guard = guardLimit("properties", 1);
     if (!guard.ok) return guard;
@@ -379,11 +389,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       createTenant,
       updateTenant,
       setTenantStatus,
+      removeTenant,
       addBranch,
       updateBranch,
       removeBranch,
     }),
-    [tenants, currentTenant, switchTenant, createTenant, updateTenant, setTenantStatus, addBranch, updateBranch, removeBranch],
+    [tenants, currentTenant, switchTenant, createTenant, updateTenant, setTenantStatus, removeTenant, addBranch, updateBranch, removeBranch],
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

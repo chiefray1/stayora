@@ -120,6 +120,7 @@ const groups: { label: string; items: NavItem[] }[] = [
   {
     label: "Platform",
     items: [
+      { to: "/admin", label: "Admin console", icon: LayoutDashboard },
       { to: "/subscription", label: "Subscription & billing", icon: CreditCard },
       { to: "/integrations", label: "Integrations & API", icon: PlugZap },
       { to: "/security", label: "Security & audit", icon: ShieldAlert },

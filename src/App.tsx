@@ -47,6 +47,7 @@ import Security from "./pages/Security";
 import Ai from "./pages/Ai";
 import Properties from "./pages/Properties";
 import Tenants from "./pages/Tenants";
+import Admin from "./pages/Admin";
 import Subscription from "./pages/Subscription";
 import Pricing from "./pages/Pricing";
 import PlatformSubscriptions from "./pages/PlatformSubscriptions";
@@ -117,6 +118,7 @@ function WorkspaceRoutes() {
               <Route path="/properties" element={<Properties />} />
               <Route path="/subscription" element={<Subscription />} />
               <Route path="/tenants" element={<Tenants />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/platform" element={<PlatformSubscriptions />} />
               <Route path="/roles" element={<Roles />} />
               <Route path="/team" element={<Team />} />

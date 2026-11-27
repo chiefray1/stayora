@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { ArrowRightLeft, Building2, CheckCircle2, Globe2, Plus, ShieldCheck, Users, Wallet } from "lucide-react";
 import { useTenant, PLAN_LIMITS, totalRooms, type TenantPlan } from "../lib/tenants";
 import { TIER_LABEL, usd } from "../lib/plans";
@@ -79,7 +80,17 @@ export default function Tenants() {
         eyebrow="Platform administration"
         title="Tenant console"
         description="Onboard hotel groups, manage plans and switch between isolated workspaces."
-        actions={<Button onClick={() => setOpen(true)}><Plus className="size-4" /> New workspace</Button>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/admin"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted"
+            >
+              <ShieldCheck className="size-4" /> Admin console
+            </Link>
+            <Button onClick={() => setOpen(true)}><Plus className="size-4" /> New workspace</Button>
+          </div>
+        }
       />
 
       {notice && (

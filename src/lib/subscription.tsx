@@ -385,6 +385,8 @@ export interface SubscriptionValue {
   updateSettings: (patch: Partial<PlanSettings>) => void;
   subscriptionFor: (hotelId: string) => Subscription;
   invoiceById: (id: string) => BillingInvoice | undefined;
+  /** Remove all billing records for a workspace that is being deleted. */
+  removeWorkspaceBilling: (hotelId: string) => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionValue | null>(null);
@@ -1134,6 +1136,22 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     [state.invoices],
   );
 
+  const removeWorkspaceBilling = useCallback((hotelId: string) => {
+    setState((prev) => {
+      const subscriptions = { ...prev.subscriptions };
+      delete subscriptions[hotelId];
+      return {
+        ...prev,
+        subscriptions,
+        invoices: prev.invoices.filter((invoice) => invoice.hotelId !== hotelId),
+        transactions: prev.transactions.filter((entry) => entry.hotelId !== hotelId),
+        addOns: prev.addOns.filter((entry) => entry.hotelId !== hotelId),
+        paymentMethods: prev.paymentMethods.filter((entry) => entry.hotelId !== hotelId),
+        events: prev.events.filter((entry) => entry.hotelId !== hotelId),
+      };
+    });
+  }, []);
+
   const value = useMemo<SubscriptionValue>(
     () => ({
       state,
@@ -1167,6 +1185,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       updateSettings,
       subscriptionFor,
       invoiceById,
+      removeWorkspaceBilling,
     }),
     [
       state,
@@ -1198,6 +1217,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       updateSettings,
       subscriptionFor,
       invoiceById,
+      removeWorkspaceBilling,
     ],
   );
 

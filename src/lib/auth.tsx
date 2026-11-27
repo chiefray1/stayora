@@ -31,6 +31,8 @@ interface AuthAccount {
   iterations?: number;
   password?: string;
   createdAt?: string;
+  /** Platform administrators can disable a login without deleting it. */
+  disabled?: boolean;
 }
 
 /** Safe projection of an account for team screens — never exposes password material. */
@@ -39,6 +41,7 @@ export interface AccountSummary {
   name: string;
   role: string;
   createdAt?: string;
+  disabled?: boolean;
 }
 
 interface PasswordReset {
@@ -53,7 +56,7 @@ interface LoginAttempt {
   lockedUntil: number;
 }
 
-interface AuthResult {
+export interface AuthResult {
   ok: boolean;
   error?: string;
   code?: string;
@@ -241,12 +244,202 @@ const readSession = (tenantId: string): SessionUser | null => {
       return null;
     }
     const account = readAccounts(tenantId)[normalizeEmail(parsed.email)];
-    if (!account) return null;
+    if (!account || account.disabled) {
+      localStorage.removeItem(sessionKey(tenantId));
+      return null;
+    }
     return { ...toSession(account, tenantId, parsed), expiresAt };
   } catch {
     return null;
   }
 };
+
+/* ---------------------------------------------------------------------------
+ * Platform administration
+ *
+ * These helpers let the platform console work across every workspace without
+ * loading each tenant's AuthProvider. They operate on the same per-tenant
+ * storage as the regular sign-in flow, so changes take effect immediately.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Seed the showcase workspaces' demo team for the platform console even when
+ * that workspace has not been opened in this browser yet. The workspace's own
+ * AuthProvider hashes the temporary passwords on first visit.
+ * Returns true when accounts were created.
+ */
+export function ensureDemoWorkspaceAccounts(tenantId: string, ownerEmail: string): boolean {
+  if (!DEMO_TENANT_IDS.includes(tenantId)) return false;
+  if (Object.keys(readAccounts(tenantId)).length > 0) return false;
+  writeAccounts(
+    tenantId,
+    Object.fromEntries(
+      demoAccountsFor(ownerEmail).map((account) => [
+        account.email,
+        { ...account, createdAt: new Date().toISOString() },
+      ]),
+    ),
+  );
+  return true;
+}
+
+/** Read the login directory of any workspace without exposing password material. */
+export function listWorkspaceAccounts(tenantId: string): AccountSummary[] {
+  return Object.values(readAccounts(tenantId))
+    .map((account) => ({
+      email: account.email,
+      name: account.name,
+      role: account.role,
+      createdAt: account.createdAt,
+      disabled: account.disabled,
+    }))
+    .sort((left, right) => {
+      const rank = (role: string) => (role === "Superadmin" ? 0 : 1);
+      return rank(left.role) - rank(right.role) || left.name.localeCompare(right.name);
+    });
+}
+
+const clearSessionFor = (tenantId: string, email: string) => {
+  try {
+    const raw = localStorage.getItem(sessionKey(tenantId));
+    if (!raw) return;
+    const session = JSON.parse(raw) as SessionUser;
+    if (normalizeEmail(session.email) === normalizeEmail(email)) {
+      localStorage.removeItem(sessionKey(tenantId));
+    }
+  } catch {
+    // ignore malformed sessions
+  }
+};
+
+export async function adminCreateAccount(input: {
+  tenantId: string;
+  email: string;
+  name: string;
+  password: string;
+  role?: string;
+}): Promise<AuthResult> {
+  const normalized = normalizeEmail(input.email);
+  if (!isEmail(normalized)) return { ok: false, error: "Enter a valid email address." };
+  if (input.password.length < 6) return { ok: false, error: "Password must be at least 6 characters." };
+  const accounts = readAccounts(input.tenantId);
+  if (accounts[normalized]) return { ok: false, error: "An account with that email already exists in this workspace." };
+
+  const isFirstAccount = Object.keys(accounts).length === 0;
+  if (!isFirstAccount && input.role === "Superadmin") {
+    return { ok: false, error: "This workspace already has a Superadmin." };
+  }
+  const role = isFirstAccount ? "Superadmin" : input.role ?? "Front desk";
+  const createdAt = new Date().toISOString();
+
+  try {
+    const salt = randomSalt();
+    const passwordHash = await hashPassword(input.password, salt);
+    accounts[normalized] = {
+      email: normalized,
+      name: input.name.trim(),
+      role,
+      salt,
+      passwordHash,
+      iterations: PBKDF2_ITERATIONS,
+      createdAt,
+    };
+  } catch {
+    accounts[normalized] = {
+      email: normalized,
+      name: input.name.trim(),
+      role,
+      password: input.password,
+      createdAt,
+    };
+  }
+  writeAccounts(input.tenantId, accounts);
+  return { ok: true };
+}
+
+export async function adminResetPassword(input: {
+  tenantId: string;
+  email: string;
+  newPassword: string;
+}): Promise<AuthResult> {
+  if (input.newPassword.length < 6) return { ok: false, error: "Password must be at least 6 characters." };
+  const normalized = normalizeEmail(input.email);
+  const accounts = readAccounts(input.tenantId);
+  const account = accounts[normalized];
+  if (!account) return { ok: false, error: "That account could not be found." };
+
+  try {
+    const salt = randomSalt();
+    const passwordHash = await hashPassword(input.newPassword, salt);
+    accounts[normalized] = {
+      ...account,
+      password: undefined,
+      salt,
+      passwordHash,
+      iterations: PBKDF2_ITERATIONS,
+    };
+  } catch {
+    accounts[normalized] = {
+      ...account,
+      password: input.newPassword,
+      salt: undefined,
+      passwordHash: undefined,
+      iterations: undefined,
+    };
+  }
+  writeAccounts(input.tenantId, accounts);
+
+  const resets = readResets(input.tenantId);
+  delete resets[normalized];
+  writeResets(input.tenantId, resets);
+  clearLoginAttempts(input.tenantId, normalized);
+  clearSessionFor(input.tenantId, normalized);
+  return { ok: true };
+}
+
+export function adminSetRole(input: { tenantId: string; email: string; role: string }): AuthResult {
+  const normalized = normalizeEmail(input.email);
+  const accounts = readAccounts(input.tenantId);
+  const account = accounts[normalized];
+  if (!account) return { ok: false, error: "That account could not be found." };
+  if (account.role === "Superadmin") {
+    return { ok: false, error: "The workspace Superadmin's role cannot be changed." };
+  }
+  if (input.role === "Superadmin") {
+    return { ok: false, error: "Only the workspace owner can be Superadmin." };
+  }
+  accounts[normalized] = { ...account, role: input.role };
+  writeAccounts(input.tenantId, accounts);
+  return { ok: true };
+}
+
+export function adminSetDisabled(input: { tenantId: string; email: string; disabled: boolean }): AuthResult {
+  const normalized = normalizeEmail(input.email);
+  const accounts = readAccounts(input.tenantId);
+  const account = accounts[normalized];
+  if (!account) return { ok: false, error: "That account could not be found." };
+  if (account.role === "Superadmin" && input.disabled) {
+    return { ok: false, error: "The workspace Superadmin cannot be disabled." };
+  }
+  accounts[normalized] = { ...account, disabled: input.disabled };
+  writeAccounts(input.tenantId, accounts);
+  if (input.disabled) clearSessionFor(input.tenantId, normalized);
+  return { ok: true };
+}
+
+export function adminRemoveAccount(input: { tenantId: string; email: string }): AuthResult {
+  const normalized = normalizeEmail(input.email);
+  const accounts = readAccounts(input.tenantId);
+  const account = accounts[normalized];
+  if (!account) return { ok: false, error: "That account could not be found." };
+  if (account.role === "Superadmin") {
+    return { ok: false, error: "Delete the workspace to remove its Superadmin." };
+  }
+  delete accounts[normalized];
+  writeAccounts(input.tenantId, accounts);
+  clearSessionFor(input.tenantId, normalized);
+  return { ok: true };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { currentTenant } = useTenant();
@@ -263,6 +456,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: account.name,
           role: account.role,
           createdAt: account.createdAt,
+          disabled: account.disabled,
         }))
         .sort((left, right) => {
           const rank = (role: string) => (role === "Superadmin" ? 0 : 1);
@@ -271,9 +465,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [tenantId, accountVersion],
   );
 
-  /** The workspace owner (Superadmin) does not consume a staff seat. */
+  /** The workspace owner (Superadmin) does not consume a staff seat. Disabled logins are freed. */
   const staffSeats = useMemo(
-    () => accounts.filter((account) => account.role !== "Superadmin").length,
+    () => accounts.filter((account) => account.role !== "Superadmin" && !account.disabled).length,
     [accounts],
   );
 
@@ -373,6 +567,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!account) {
           recordFailedLogin(scope, normalized);
           return { ok: false, error: "No staff account found for this workspace. Contact an administrator." };
+        }
+        if (account.disabled) {
+          return { ok: false, error: "This account has been disabled by the platform team. Contact your administrator." };
         }
 
         try {

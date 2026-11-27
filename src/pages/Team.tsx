@@ -296,7 +296,7 @@ export default function Team() {
                     </td>
                     <td className="text-xs text-muted-foreground">{added}</td>
                     <td>
-                      <StatusPill status="active" />
+                      <StatusPill status={account.disabled ? "inactive" : "active"} />
                     </td>
                     <td className="text-right">
                       {isOwner || isSelf ? (
@@ -357,7 +357,7 @@ export default function Team() {
                   </div>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <StatusPill status="active" />
+                  <StatusPill status={account.disabled ? "inactive" : "active"} />
                   {isOwner || isSelf ? (
                     <span className="text-[10px] font-semibold text-muted-foreground">
                       {isOwner ? "Owner" : "You"}

@@ -13,7 +13,7 @@ entitlements and an add-on marketplace.
 - **Growth** — CRM & marketing, loyalty, WhatsApp agent, optional online booking system
 - **People** — HR & attendance, attendance clock, payroll & staff, roles & permissions
 - **Supplies** — inventory, procurement, transport, documents
-- **Platform** — subscription & billing, integrations & API, security & audit, AI studio,
+- **Platform** — admin console, subscription & billing, integrations & API, security & audit, AI studio,
   properties & config, tenant console, subscription control
 
 ## Self-serve signup and team access
@@ -25,6 +25,23 @@ entitlements and an add-on marketplace.
 - The Superadmin invites staff from **Team & access** (`/team`). Each plan includes a fixed number
   of staff sign-in seats — Free 2, Starter 10, Professional 30 — and staff only see the modules
   included in the workspace's package, filtered further by their role permissions.
+
+## Platform administration
+
+- The **Admin console** (`/admin`) is the operator view of the whole platform. It is restricted to
+  `admin@stayora.ng` (see `PLATFORM_ADMIN_EMAILS`), so a hotel's own Superadmin never sees another
+  hotel's users or data.
+- Overview: workspace and user counts, MRR, plan distribution, workspaces needing attention and
+  recent signups.
+- Workspaces: create a workspace with its owner (the owner becomes that workspace's Superadmin),
+  search and filter by plan or status, change a package, suspend or reactivate access, open the
+  workspace, export the list as CSV, or delete a workspace with all of its users, data, sessions and
+  billing records.
+- Users: a single directory across every workspace with search and filters by workspace, role and
+  status. Operators can add a login, reset a password (signing that user out everywhere), change a
+  role, disable or re-enable a login, remove an account, and export the directory as CSV.
+- Activity: a merged feed of workspace creation, new users, billing events and hotel audit entries.
+- The console is fully responsive — tables collapse to cards on phones and the action bars wrap.
 
 ## Plans, add-ons and branding
 

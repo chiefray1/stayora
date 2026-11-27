@@ -37,6 +37,7 @@ const PATH_MODULE: Record<string, string> = {
   "/subscription": "billing",
   "/tenants": "tenants",
   "/platform": "tenants",
+  "/admin": "tenants",
 };
 
 const ACCOUNT_PATHS = ["/profile", "/settings"];
@@ -53,7 +54,7 @@ export const isPlatformAdmin = (email?: string) =>
 export function canAccessPath(role: string | undefined, roles: Role[], pathname: string, email?: string) {
   if (!role) return false;
   if (ACCOUNT_PATHS.includes(pathname)) return true;
-  if (pathname === "/tenants" || pathname === "/platform") {
+  if (pathname === "/tenants" || pathname === "/platform" || pathname === "/admin") {
     return role === "Superadmin" && isPlatformAdmin(email);
   }
   if (pathname === "/team") return role === "Superadmin";
