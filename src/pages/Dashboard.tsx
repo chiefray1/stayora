@@ -19,6 +19,7 @@ import { useAuth } from "../lib/auth";
 import { canAccessPath } from "../lib/permissions";
 import { useStore } from "../lib/store";
 import { useTenant } from "../lib/tenants";
+import { useEntitlements } from "../lib/subscription";
 import { addDays, naira, todayISO, todayLabel } from "../lib/format";
 import { occupancyWeek } from "../lib/seed";
 import { channelPerformance } from "../lib/channels";
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const { db, checkIn, checkOut } = useStore();
   const { user } = useAuth();
   const { currentTenant } = useTenant();
+  const { canModule } = useEntitlements();
   const today = todayISO();
   const canViewChannels = canAccessPath(user?.role, db.roles, "/channels");
   const canViewReports = canAccessPath(user?.role, db.roles, "/reports");
@@ -104,9 +106,11 @@ export default function Dashboard() {
           <Link to="/reservations" className={buttonClass("outline")}>
             <CalendarDays className="size-4" /> New reservation
           </Link>
-          <Link to="/book" target="_blank" rel="noopener noreferrer" className={buttonClass("primary")}>
-            <ArrowUpRight className="size-4" /> Booking page
-          </Link>
+          {canModule("booking") && (
+            <Link to="/book" target="_blank" rel="noopener noreferrer" className={buttonClass("primary")}>
+              <ArrowUpRight className="size-4" /> Booking page
+            </Link>
+          )}
         </div>
       </div>
 

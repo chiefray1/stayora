@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft, ArrowUpRight, Mail, Phone, ShieldCheck } from "lucide-react";
 import { cn } from "../components/ui";
+import { useEntitlements } from "../lib/subscription";
 
 const CONTACT_EMAIL = "reservations@stayora.ng";
 const CONTACT_PHONE = "0805 535 0960";
@@ -11,6 +12,8 @@ const UPDATED = "12 November 2026";
 export default function Policies() {
   const { pathname } = useLocation();
   const isRefund = pathname === "/refund";
+  const { canModule, usable } = useEntitlements();
+  const bookingEnabled = usable && canModule("booking");
 
   return (
     <div className="min-h-screen bg-background">
@@ -27,9 +30,11 @@ export default function Policies() {
             <Link to="/" className="hidden rounded-md px-3 py-2 text-muted-foreground hover:text-foreground sm:block">
               Home
             </Link>
-            <Link to="/book" className="rounded-md px-3 py-2 font-semibold hover:text-gold">
-              Book a room
-            </Link>
+            {bookingEnabled && (
+              <Link to="/book" className="rounded-md px-3 py-2 font-semibold hover:text-gold">
+                Book a room
+              </Link>
+            )}
             <Link to="/auth" className="rounded-md px-3 py-2 text-muted-foreground hover:text-foreground">
               Staff
             </Link>

@@ -548,9 +548,11 @@ export default function AppShell() {
           <span>© {new Date().getFullYear()} Stayora Hotel Suite · {currentTenant.city}</span>
           <span className="flex items-center gap-3">
             <span className="flex items-center gap-1"><Database className="size-3" /> Tenant-isolated demo data</span>
-            <Link to="/book" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
-              <Settings className="size-3" /> Booking page
-            </Link>
+            {canModule("booking") && (
+              <Link to="/book" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
+                <Settings className="size-3" /> Booking page
+              </Link>
+            )}
           </span>
         </footer>
       </div>
