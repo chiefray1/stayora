@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   ArrowUpRight,
   BedDouble,
@@ -14,6 +15,7 @@ import {
   TrendingUp,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { canAccessPath } from "../lib/permissions";
@@ -38,7 +40,26 @@ export default function Dashboard() {
   const { db, checkIn, checkOut } = useStore();
   const { user } = useAuth();
   const { currentTenant } = useTenant();
-  const { canModule } = useEntitlements();
+  const { canModule, plan } = useEntitlements();
+  const location = useLocation();
+  const welcome = (location.state as { welcome?: string } | null)?.welcome;
+  const welcomeKey = `stayora.welcome.${currentTenant.id}`;
+  const [showWelcome, setShowWelcome] = useState(() => {
+    if (!welcome) return false;
+    try {
+      return localStorage.getItem(welcomeKey) !== "1";
+    } catch {
+      return true;
+    }
+  });
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    try {
+      localStorage.setItem(welcomeKey, "1");
+    } catch {
+      // ignore storage failures
+    }
+  };
   const today = todayISO();
   const canViewChannels = canAccessPath(user?.role, db.roles, "/channels");
   const canViewReports = canAccessPath(user?.role, db.roles, "/reports");
@@ -113,6 +134,40 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {showWelcome && (
+        <div className="mb-4 flex flex-wrap items-start gap-3 rounded-xl border border-primary/25 bg-accent px-4 py-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-gold">
+            <Sparkles className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">
+              Welcome{welcome ? `, ${welcome}` : ""} — your workspace is live on {plan.name}.
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              You are the Superadmin. The Free package covers {plan.limits.rooms} rooms and{" "}
+              {plan.limits.staff} staff seats. Upgrade any time to unlock more rooms, more staff and the
+              bigger modules.
+            </p>
+          </div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <Link to="/subscription" className={buttonClass("primary", "sm", "flex-1 sm:flex-none")}>
+              Upgrade plan <ArrowUpRight className="size-3.5" />
+            </Link>
+            <Link to="/team" className={buttonClass("outline", "sm", "flex-1 sm:flex-none")}>
+              Invite staff
+            </Link>
+            <button
+              type="button"
+              onClick={dismissWelcome}
+              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-white/60 hover:text-foreground"
+              aria-label="Dismiss welcome message"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard

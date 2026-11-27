@@ -253,12 +253,19 @@ export default function Auth() {
               </Button>
             </form>
 
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              New hotel or hostel?{" "}
+              <Link to="/signup" className="font-semibold text-gold hover:underline">
+                Create a free workspace
+              </Link>
+            </p>
+
             <div className="mt-6 rounded-lg border border-primary/20 bg-accent px-4 py-3 text-xs text-accent-foreground">
               <p className="font-semibold">{showDemo ? "Demo access" : "Workspace access"}</p>
               <p className="mt-0.5 text-muted-foreground">
                 {showDemo
-                  ? "Use one of the seeded demo accounts below. New accounts cannot be created from this screen."
-                  : "Sign in with the owner email and temporary password provided when this workspace was created."}
+                  ? "Use one of the seeded demo accounts below. Staff accounts in real workspaces are invited by the Superadmin."
+                  : "Sign in with the owner email and password used when this workspace was created. Staff sign-ins are invited from Team & access."}
               </p>
               {showDemo && (
                 <div className="mt-2 flex flex-wrap gap-1.5">

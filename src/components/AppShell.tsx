@@ -38,6 +38,7 @@ import {
   Shirt,
   Sparkles,
   UserCog,
+  UserPlus,
   UserRound,
   Users,
   UtensilsCrossed,
@@ -48,7 +49,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useStore } from "../lib/store";
-import { canAccessPath, moduleForPath } from "../lib/permissions";
+import { canAccessPath, isPlatformAdmin, moduleForPath } from "../lib/permissions";
 import { timeAgo, todayLabel } from "../lib/format";
 import { useTenant } from "../lib/tenants";
 import { useEntitlements } from "../lib/subscription";
@@ -103,6 +104,7 @@ const groups: { label: string; items: NavItem[] }[] = [
       { to: "/hr", label: "HR & attendance", icon: UserCog },
       { to: "/attendance", label: "Attendance", icon: Fingerprint },
       { to: "/payroll", label: "Payroll & staff", icon: Wallet },
+      { to: "/team", label: "Team & access", icon: UserPlus },
       { to: "/roles", label: "Roles & permissions", icon: ShieldCheck },
     ],
   },
@@ -143,10 +145,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { plan, canModule } = useEntitlements();
   const pendingTasks = db.tasks.filter((t) => t.status === "pending" || t.status === "in-progress").length;
   const roomFloors = new Set(db.rooms.map((room) => room.floor)).size;
+  const canSwitchWorkspace = user?.role === "Superadmin" && isPlatformAdmin(user.email);
   const visibleGroups = groups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => canAccessPath(user?.role, db.roles, item.to)),
+      items: group.items.filter((item) => canAccessPath(user?.role, db.roles, item.to, user?.email)),
     }))
     .filter((group) => group.items.length > 0);
 
@@ -167,7 +170,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             {plan.name.replace("Stayora ", "")}
           </span>
         </div>
-        {user?.role === "Superadmin" ? (
+        {canSwitchWorkspace ? (
           <select
             value={currentTenant.id}
             onChange={(event) => {
@@ -344,8 +347,8 @@ export default function AppShell() {
     };
   }, []);
 
-  if (!canAccessPath(user?.role, db.roles, location.pathname)) {
-    const fallback = canAccessPath(user?.role, db.roles, "/dashboard") ? "/dashboard" : "/profile";
+  if (!canAccessPath(user?.role, db.roles, location.pathname, user?.email)) {
+    const fallback = canAccessPath(user?.role, db.roles, "/dashboard", user?.email) ? "/dashboard" : "/profile";
     return <Navigate to={fallback} replace />;
   }
 

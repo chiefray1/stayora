@@ -16,6 +16,16 @@ entitlements and an add-on marketplace.
 - **Platform** — subscription & billing, integrations & API, security & audit, AI studio,
   properties & config, tenant console, subscription control
 
+## Self-serve signup and team access
+
+- Anyone can create a hotel workspace from `/signup`. New workspaces always start on the **Free**
+  plan; bigger packages are unlocked by upgrading from Subscription & billing.
+- The **first account created for a workspace becomes its Superadmin** and owns that workspace.
+  Later accounts can never be given the Superadmin role.
+- The Superadmin invites staff from **Team & access** (`/team`). Each plan includes a fixed number
+  of staff sign-in seats — Free 2, Starter 10, Professional 30 — and staff only see the modules
+  included in the workspace's package, filtered further by their role permissions.
+
 ## Plans, add-ons and branding
 
 - Three plans: Free, Starter and Professional, with room, staff and property limits.

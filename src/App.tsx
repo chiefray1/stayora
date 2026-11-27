@@ -8,6 +8,7 @@ import { TenantProvider, useTenant } from "./lib/tenants";
 import AppShell from "./components/AppShell";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
+import Signup from "./pages/Signup";
 import Book from "./pages/Book";
 import Dashboard from "./pages/Dashboard";
 import Reservations from "./pages/Reservations";
@@ -28,6 +29,7 @@ import Payroll from "./pages/Payroll";
 import Transport from "./pages/Transport";
 import Whatsapp from "./pages/Whatsapp";
 import Roles from "./pages/Roles";
+import Team from "./pages/Team";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Policies from "./pages/Policies";
@@ -74,6 +76,7 @@ function WorkspaceRoutes() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/signup" element={<Signup />} />
           <Route path="/book" element={<BookingGate><Book /></BookingGate>} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/privacy" element={<Policies />} />
@@ -116,6 +119,7 @@ function WorkspaceRoutes() {
               <Route path="/tenants" element={<Tenants />} />
               <Route path="/platform" element={<PlatformSubscriptions />} />
               <Route path="/roles" element={<Roles />} />
+              <Route path="/team" element={<Team />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

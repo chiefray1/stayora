@@ -21,6 +21,7 @@ const PATH_MODULE: Record<string, string> = {
   "/transport": "transport",
   "/whatsapp": "whatsapp",
   "/roles": "roles",
+  "/team": "roles",
   "/kitchen": "kitchen",
   "/laundry": "laundry",
   "/loyalty": "loyalty",
@@ -40,10 +41,22 @@ const PATH_MODULE: Record<string, string> = {
 
 const ACCOUNT_PATHS = ["/profile", "/settings"];
 
-export function canAccessPath(role: string | undefined, roles: Role[], pathname: string) {
+/**
+ * Platform operators may switch between every hotel workspace and open the
+ * tenant console. A hotel's own Superadmin is scoped to that hotel only.
+ */
+export const PLATFORM_ADMIN_EMAILS = ["admin@stayora.ng"];
+
+export const isPlatformAdmin = (email?: string) =>
+  Boolean(email && PLATFORM_ADMIN_EMAILS.includes(email.trim().toLowerCase()));
+
+export function canAccessPath(role: string | undefined, roles: Role[], pathname: string, email?: string) {
   if (!role) return false;
   if (ACCOUNT_PATHS.includes(pathname)) return true;
-  if (pathname === "/tenants" || pathname === "/platform") return role === "Superadmin";
+  if (pathname === "/tenants" || pathname === "/platform") {
+    return role === "Superadmin" && isPlatformAdmin(email);
+  }
+  if (pathname === "/team") return role === "Superadmin";
   if (pathname === "/subscription") return true;
 
   const moduleId = PATH_MODULE[pathname];

@@ -110,6 +110,9 @@ export default function Landing() {
                   Book a room
                 </Link>
               )}
+              <Link to="/signup" className={buttonClass("white", "md")}>
+                Start free
+              </Link>
             </div>
             <Link to="/auth" className={buttonClass("primary", "md", "whitespace-nowrap")}>
               Staff sign in
@@ -293,6 +296,9 @@ export default function Landing() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3 lg:justify-end">
+              <Link to="/signup" className={buttonClass("primary", "lg")}>
+                Create a hotel account <ArrowRight className="size-4" />
+              </Link>
               <Link to="/auth" className={buttonClass("dark", "lg")}>
                 Staff sign in <ArrowRight className="size-4" />
               </Link>
@@ -317,6 +323,7 @@ export default function Landing() {
             {bookingEnabled && <Link to="/book" className="hover:text-foreground">Book a room</Link>}
             <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link to="/refund" className="hover:text-foreground">Refund policy</Link>
+            <Link to="/signup" className="hover:text-foreground">Create account</Link>
             <Link to="/auth" className="hover:text-foreground">Staff</Link>
           </div>
         </div>

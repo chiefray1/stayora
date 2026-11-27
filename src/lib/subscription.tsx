@@ -391,7 +391,7 @@ const SubscriptionContext = createContext<SubscriptionValue | null>(null);
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { tenants, currentTenant, updateTenant } = useTenant();
-  const { user } = useAuth();
+  const { user, staffSeats } = useAuth();
   const { db, addNotification, logAudit } = useStore();
   const [state, setState] = useState<BillingState>(() => readState(tenants));
   const stateRef = useRef(state);
@@ -536,14 +536,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     const month = new Date().toISOString().slice(0, 7);
     return {
       rooms: db.rooms.length,
-      staff: db.staff.length,
+      staff: staffSeats,
       properties: currentTenant.branches.length,
       reservationsThisMonth: db.reservations.filter(
         (reservation) => reservation.createdAt.slice(0, 7) === month && reservation.status !== "cancelled",
       ).length,
       storageGb: Math.round(db.documents.reduce((sum, doc) => sum + sizeToGb(doc.size), 0) * 100) / 100,
     };
-  }, [db.rooms, db.staff, db.documents, db.reservations, currentTenant.branches.length]);
+  }, [db.rooms, staffSeats, db.documents, db.reservations, currentTenant.branches.length]);
 
   useEffect(() => {
     registerBillingSnapshot({
@@ -1225,6 +1225,7 @@ export interface UsageSnapshot {
 export function useEntitlements() {
   const { db } = useStore();
   const { currentTenant } = useTenant();
+  const { staffSeats } = useAuth();
   const { subscription, addOnIds, settings, effective, usable } = useSubscription();
 
   const entitlements: Entitlements = useMemo(
@@ -1237,14 +1238,14 @@ export function useEntitlements() {
     const storage = db.documents.reduce((sum, doc) => sum + sizeToGb(doc.size), 0);
     return {
       rooms: db.rooms.length,
-      staff: db.staff.length,
+      staff: staffSeats,
       properties: currentTenant.branches.length,
       reservationsThisMonth: db.reservations.filter(
         (reservation) => reservation.createdAt.slice(0, 7) === month && reservation.status !== "cancelled",
       ).length,
       storageGb: Math.round(storage * 100) / 100,
     };
-  }, [db.rooms, db.staff, db.documents, db.reservations, currentTenant.branches.length]);
+  }, [db.rooms, staffSeats, db.documents, db.reservations, currentTenant.branches.length]);
 
   const checks = useMemo(
     () => ({

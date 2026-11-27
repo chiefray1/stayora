@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -29,6 +30,15 @@ interface AuthAccount {
   salt?: string;
   iterations?: number;
   password?: string;
+  createdAt?: string;
+}
+
+/** Safe projection of an account for team screens — never exposes password material. */
+export interface AccountSummary {
+  email: string;
+  name: string;
+  role: string;
+  createdAt?: string;
 }
 
 interface PasswordReset {
@@ -61,6 +71,10 @@ interface ProvisionInput {
 
 interface AuthValue {
   user: SessionUser | null;
+  /** Login accounts for the active workspace (no password material). */
+  accounts: AccountSummary[];
+  /** Non-owner logins currently using a plan seat. */
+  staffSeats: number;
   signIn: (email: string, password: string, tenantId?: string) => Promise<AuthResult>;
   signOut: () => void;
   changePassword: (currentPassword: string, newPassword: string) => Promise<AuthResult>;
@@ -68,6 +82,8 @@ interface AuthValue {
   resetPassword: (email: string, code: string, newPassword: string) => Promise<AuthResult>;
   updateProfile: (patch: ProfilePatch) => AuthResult;
   provisionAccount: (input: ProvisionInput) => Promise<AuthResult>;
+  removeAccount: (email: string) => AuthResult;
+  refreshAccounts: () => void;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -84,6 +100,9 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 5 * 60 * 1000;
 const PBKDF2_ITERATIONS = 120_000;
 const DEMO_PASSWORD = "stayora";
+
+/** Seeded showcase workspaces — only these get demo staff accounts created automatically. */
+export const DEMO_TENANT_IDS = ["tnt-stayora-lagos", "tnt-stayora-abuja", "tnt-zuri-nairobi"];
 
 const DEMO_ACCOUNTS = (domain: string): AuthAccount[] => [
   { email: `admin@${domain}`, name: "Ada Admin", role: "Superadmin", password: DEMO_PASSWORD },
@@ -233,6 +252,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { currentTenant } = useTenant();
   const tenantId = currentTenant.id;
   const [user, setUser] = useState<SessionUser | null>(() => readSession(tenantId));
+  const [accountVersion, setAccountVersion] = useState(0);
+  const refreshAccounts = useCallback(() => setAccountVersion((version) => version + 1), []);
+
+  const accounts = useMemo<AccountSummary[]>(
+    () =>
+      Object.values(readAccounts(tenantId))
+        .map((account) => ({
+          email: account.email,
+          name: account.name,
+          role: account.role,
+          createdAt: account.createdAt,
+        }))
+        .sort((left, right) => {
+          const rank = (role: string) => (role === "Superadmin" ? 0 : 1);
+          return rank(left.role) - rank(right.role) || left.name.localeCompare(right.name);
+        }),
+    [tenantId, accountVersion],
+  );
+
+  /** The workspace owner (Superadmin) does not consume a staff seat. */
+  const staffSeats = useMemo(
+    () => accounts.filter((account) => account.role !== "Superadmin").length,
+    [accounts],
+  );
 
   useEffect(() => {
     setUser((previous) => {
@@ -246,12 +289,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const prepareAccounts = async () => {
       const accounts = readAccounts(tenantId);
       if (Object.keys(accounts).length === 0) {
+        // Self-serve workspaces start with only the owner account. Demo workspaces
+        // get their showcase team seeded once.
+        if (!DEMO_TENANT_IDS.includes(tenantId)) return;
         writeAccounts(
           tenantId,
           Object.fromEntries(
-            demoAccountsFor(currentTenant.ownerEmail).map((account) => [account.email, account]),
+            demoAccountsFor(currentTenant.ownerEmail).map((account) => [
+              account.email,
+              { ...account, createdAt: new Date().toISOString() },
+            ]),
           ),
         );
+        if (!cancelled) refreshAccounts();
         return;
       }
 
@@ -273,13 +323,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
       }
-      if (changed && !cancelled) writeAccounts(tenantId, accounts);
+      if (changed && !cancelled) {
+        writeAccounts(tenantId, accounts);
+        refreshAccounts();
+      }
     };
     void prepareAccounts();
     return () => {
       cancelled = true;
     };
-  }, [tenantId]);
+  }, [tenantId, currentTenant.ownerEmail, refreshAccounts]);
 
   useEffect(() => {
     if (user) localStorage.setItem(sessionKey(user.tenantId), JSON.stringify(user));
@@ -300,6 +353,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthValue>(
     () => ({
       user,
+      accounts,
+      staffSeats,
       signIn: async (email: string, password: string, targetTenantId?: string) => {
         const scope = targetTenantId ?? tenantId;
         const normalized = normalizeEmail(email);
@@ -338,6 +393,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 iterations: PBKDF2_ITERATIONS,
               };
               writeAccounts(scope, accounts);
+              if (scope === tenantId) refreshAccounts();
             }
           }
 
@@ -470,6 +526,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           delete resets[normalized];
           writeResets(tenantId, resets);
           clearLoginAttempts(tenantId, normalized);
+          refreshAccounts();
           return { ok: true };
         } catch {
           return { ok: false, error: "Secure password hashing is unavailable. Open the site over HTTPS and try again." };
@@ -496,6 +553,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: patch.name ?? account.name,
         };
         writeAccounts(scope, accounts);
+        refreshAccounts();
 
         setUser((prev) => (prev ? { ...prev, ...patch, email: nextEmail } : prev));
         return { ok: true };
@@ -507,32 +565,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (input.password.length < 6) return { ok: false, error: "Password must be at least 6 characters." };
         const accounts = readAccounts(scope);
         if (accounts[normalized]) return { ok: false, error: "An account with that email already exists in this workspace." };
+
+        // The first account created for a workspace is always its distinctive Superadmin.
+        // Every later account must be given a normal role.
+        const isFirstAccount = Object.keys(accounts).length === 0;
+        if (!isFirstAccount && input.role === "Superadmin") {
+          return { ok: false, error: "This workspace already has a Superadmin. Choose a staff role instead." };
+        }
+        const role = isFirstAccount ? "Superadmin" : input.role ?? "Front desk";
+        const createdAt = new Date().toISOString();
+
         try {
           const salt = randomSalt();
           const passwordHash = await hashPassword(input.password, salt);
           accounts[normalized] = {
             email: normalized,
             name: input.name.trim(),
-            role: input.role ?? "Superadmin",
+            role,
             salt,
             passwordHash,
             iterations: PBKDF2_ITERATIONS,
+            createdAt,
           };
           writeAccounts(scope, accounts);
+          if (scope === tenantId) refreshAccounts();
           return { ok: true };
         } catch {
           accounts[normalized] = {
             email: normalized,
             name: input.name.trim(),
-            role: input.role ?? "Superadmin",
+            role,
             password: input.password,
+            createdAt,
           };
           writeAccounts(scope, accounts);
+          if (scope === tenantId) refreshAccounts();
           return { ok: true };
         }
       },
+      removeAccount: (email: string) => {
+        const scope = user?.tenantId ?? tenantId;
+        const normalized = normalizeEmail(email);
+        if (!user) return { ok: false, error: "You need to be signed in to manage staff access." };
+        if (normalized === normalizeEmail(user.email)) {
+          return { ok: false, error: "You cannot remove your own account." };
+        }
+        const accounts = readAccounts(scope);
+        const account = accounts[normalized];
+        if (!account) return { ok: false, error: "That staff account could not be found." };
+        if (account.role === "Superadmin") {
+          return { ok: false, error: "The workspace Superadmin cannot be removed." };
+        }
+        delete accounts[normalized];
+        writeAccounts(scope, accounts);
+        refreshAccounts();
+        return { ok: true };
+      },
+      refreshAccounts,
     }),
-    [tenantId, user],
+    [tenantId, user, accounts, staffSeats, refreshAccounts],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
